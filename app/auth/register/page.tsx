@@ -39,7 +39,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card className="border-border/50 shadow-sm">
+    <Card className="w-full h-full md:w-1/2 lg:w-1/3 border-0 shadow-none rounded-none bg-transparent">
       <CardHeader>
         <CardTitle className="text-xl">Create your artist account</CardTitle>
       </CardHeader>

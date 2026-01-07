@@ -22,7 +22,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-md p-4">
+      <main className="mx-auto w-full p-4 min-h-[calc(100vh-56px)] flex items-center justify-center overflow-hidden md:overflow-auto">
         {children}
       </main>
     </div>
