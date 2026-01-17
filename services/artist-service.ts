@@ -10,8 +10,13 @@ export const artistService = {
 
   // Profile
   getProfile: (id: string) => apiClient.get(`/api/artist/getArtistById/${id}`).then((res) => res.data),
+  getProfileByName: (name: string) => apiClient.get(`/api/artist/getArtistByName/${encodeURIComponent(name)}`).then((res) => res.data),
+  getAllArtists: () => apiClient.get("/api/artist/getAllArtists").then((res) => res.data),
   getProfileMe: () => apiClient.get("/api/artist/profile/me").then((res) => res.data),
   updateProfile: (data: any) => apiClient.post("/api/artist/profile/edit", data),
+  followArtist: (artistId: string, userId: string) => apiClient.post("/api/artist/followArtist", { artistId, userId }),
+  likeArtist: (artistId: string, userId: string) => apiClient.post("/api/artist/likeArtist", { artistId, userId }),
+  deleteArtist: (artistId: string) => apiClient.post("/api/artist/deleteArtist", { artistId }),
 
   // Songs
   getMySongs: () => apiClient.get("/api/artist/song/my"),

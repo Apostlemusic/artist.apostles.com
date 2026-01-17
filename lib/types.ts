@@ -23,6 +23,7 @@ export type Song = {
   trackUrl?: string
   trackImg?: string
   description?: string
+  lyrics?: string
   likes: string[]
   genre: string[]
   hidden: boolean
@@ -41,6 +42,7 @@ export type Album = {
   hidden: boolean
   tracksId?: string[]
   likes?: string[]
+  author?: string
 }
 
 export type UploadAlbumData = {
@@ -70,6 +72,7 @@ export type UploadSongData = {
   trackUrl: string
   trackImg: string
   description?: string
+  lyrics?: string
   category: string[]
   genre: string[]
   trackId: string

@@ -9,12 +9,22 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 
 export default function AlbumsPage() {
   const [albums, setAlbums] = useState<Album[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [visibilityFilter, setVisibilityFilter] = useState<"all" | "visible" | "hidden">("all")
+  const [editOpen, setEditOpen] = useState(false)
+  const [editAlbum, setEditAlbum] = useState<Album | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editCoverImg, setEditCoverImg] = useState("")
   const { toast } = useToast()
 
   const fetchAlbums = async () => {
@@ -62,19 +72,123 @@ export default function AlbumsPage() {
     }
   }
 
-  const filteredAlbums = albums.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
+  const handleEdit = (album: Album) => {
+    setEditAlbum(album)
+    setEditName(album.name || "")
+    setEditDescription(album.description || "")
+    setEditCoverImg(album.coverImg || "")
+    setEditOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editAlbum) return
+    try {
+      await albumsApi.editAlbum({
+        albumId: editAlbum._id,
+        title: editName.trim(),
+        description: editDescription.trim(),
+        coverImg: editCoverImg.trim(),
+      })
+      toast({ title: "Updated", description: "Album details updated." })
+      setEditOpen(false)
+      setEditAlbum(null)
+      fetchAlbums()
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update album.", variant: "destructive" })
+    }
+  }
+
+  const filteredAlbums = albums
+    .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((a) => {
+      if (visibilityFilter === "all") return true
+      if (visibilityFilter === "hidden") return a.hidden
+      return !a.hidden
+    })
+
+  const totalAlbums = albums.length
+  const hiddenAlbums = albums.filter((a) => a.hidden).length
+  const visibleAlbums = totalAlbums - hiddenAlbums
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Albums</h1>
-          <p className="text-muted-foreground mt-1">Manage your released albums and visibility.</p>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit album</DialogTitle>
+            <DialogDescription>Update the album details and save changes.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Album name</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Album name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-cover">Cover image URL</Label>
+              <Input
+                id="edit-cover"
+                value={editCoverImg}
+                onChange={(e) => setEditCoverImg(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Short description"
+                className="min-h-24"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={!editName.trim()}>
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Catalog</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Albums</h1>
+          <p className="text-muted-foreground">Track releases, visibility, and performance.</p>
         </div>
         <UploadAlbumDialog onAlbumUploaded={fetchAlbums} />
       </div>
 
-      <div className="flex items-center gap-4 bg-card p-4 rounded-xl border border-border/50 shadow-sm">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Total albums</p>
+            <p className="text-2xl font-semibold">{totalAlbums}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Visible</p>
+            <p className="text-2xl font-semibold">{visibleAlbums}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Hidden</p>
+            <p className="text-2xl font-semibold">{hiddenAlbums}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col md:flex-row md:items-center gap-4 bg-card p-4 rounded-xl border border-border/50 shadow-sm">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
           <Input
@@ -84,6 +198,16 @@ export default function AlbumsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Select value={visibilityFilter} onValueChange={(v) => setVisibilityFilter(v as any)}>
+          <SelectTrigger className="w-full md:w-44 border-border/50">
+            <SelectValue placeholder="Visibility" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All albums</SelectItem>
+            <SelectItem value="visible">Visible</SelectItem>
+            <SelectItem value="hidden">Hidden</SelectItem>
+          </SelectContent>
+        </Select>
         <Button variant="outline" size="icon" className="h-10 w-10 border-border/50 bg-transparent">
           <Filter className="size-4" />
         </Button>
@@ -126,6 +250,9 @@ export default function AlbumsPage() {
                       className="rounded-full"
                     >
                       {album.hidden ? "Unhide" : "Hide"}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(album)}>
+                      Edit
                     </Button>
                     <Button
                       variant="ghost"

@@ -10,6 +10,20 @@ export const albumsApi = {
     const res = await apiClient.post("/api/artist/album/upload", data)
     return res.data
   },
+  async editAlbum(data: { albumId: string; title?: string; name?: string; description?: string; coverImg?: string }): Promise<any> {
+    const payload = {
+      albumId: data.albumId,
+      title: data.title || data.name,
+      description: data.description,
+      coverImg: data.coverImg,
+    }
+    const res = await apiClient.post("/api/artist/album/edit", payload)
+    return res.data
+  },
+  async uploadSongToAlbum(data: { albumId: string; title: string; author: string; trackUrl: string; trackImg: string }): Promise<any> {
+    const res = await apiClient.post("/api/artist/album/song/upload", data)
+    return res.data
+  },
   async hideAlbum(albumId: string): Promise<any> {
     const res = await apiClient.post("/api/artist/album/hide", { albumId })
     return res.data

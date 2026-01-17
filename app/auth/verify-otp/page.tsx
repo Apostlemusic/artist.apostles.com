@@ -37,6 +37,17 @@ export default function VerifyOtpPage() {
         return
       }
       const res = await artistApi.verifyOtp({ email, otp: data.otp } as VerifyOtpData)
+      try {
+        const sixDaysMs = 6 * 24 * 60 * 60 * 1000
+        const payload = { exp: Date.now() + sixDaysMs, email }
+        window.localStorage.setItem("apostles_auth", JSON.stringify(payload))
+        if (res?.accessToken) window.localStorage.setItem("apostles_access_token", String(res.accessToken))
+        if (res?.refreshToken) window.localStorage.setItem("apostles_refresh_token", String(res.refreshToken))
+        const artistId = (res?.artist && (res.artist.id || res.artist._id)) || undefined
+        const artistName = (res?.artist && res.artist.name) || undefined
+        if (artistId) window.localStorage.setItem("apostles_artist_id", String(artistId))
+        if (artistName) window.localStorage.setItem("apostles_artist_name", String(artistName))
+      } catch {}
       toast({ title: "Verified", description: res.message || "OTP verified" })
       router.push("/dashboard")
     } catch (e) {

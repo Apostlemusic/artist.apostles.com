@@ -1,7 +1,8 @@
 "use client"
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
-import { Plus, ImageIcon, Loader2, Disc } from "lucide-react"
+import axios from "axios"
+import { Plus, ImageIcon, Loader2, Disc, Music2, Trash2 } from "lucide-react"
 
 import {
   Dialog,
@@ -18,16 +19,126 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { albumsApi } from "@/lib/api/albums"
-import type { UploadAlbumData, Category, Genre } from "@/lib/types"
+import type { UploadAlbumData, Category, Genre, Song } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { contentApi } from "@/lib/api/content"
 import { useArtistName } from "@/hooks/use-artist-name"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => void }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
+  const [songs, setSongs] = useState<Song[]>([])
+  const [selectedSongs, setSelectedSongs] = useState<string[]>([])
+  const [newSongs, setNewSongs] = useState<
+    Array<{
+      id: string
+      title: string
+      trackUrl: string
+      trackImg: string
+      audioUploading?: boolean
+      audioProgress?: number
+      imageUploading?: boolean
+      imageProgress?: number
+    }>
+  >([])
+    const uploadAudioForSong = async (songId: string, file?: File) => {
+      if (!file) return
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+      if (!cloudName || !uploadPreset) {
+        toast({
+          title: "Cloudinary not configured",
+          description: "Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      try {
+        setNewSongs((prev) =>
+          prev.map((s) =>
+            s.id === songId ? { ...s, audioUploading: true, audioProgress: 0 } : s
+          )
+        )
+        const formData = new FormData()
+        formData.append("file", file)
+        formData.append("upload_preset", uploadPreset)
+        const url = `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`
+        const res = await axios.post(url, formData, {
+          onUploadProgress: (evt) => {
+            if (!evt.total) return
+            const pct = Math.round((evt.loaded / evt.total) * 100)
+            setNewSongs((prev) =>
+              prev.map((s) => (s.id === songId ? { ...s, audioProgress: pct } : s))
+            )
+          },
+        })
+        const secureUrl = res?.data?.secure_url || res?.data?.url || ""
+        setNewSongs((prev) =>
+          prev.map((s) =>
+            s.id === songId ? { ...s, trackUrl: secureUrl, audioUploading: false } : s
+          )
+        )
+      } catch (err) {
+        setNewSongs((prev) =>
+          prev.map((s) =>
+            s.id === songId ? { ...s, audioUploading: false, audioProgress: 0 } : s
+          )
+        )
+        toast({ title: "Upload failed", description: "Could not upload audio file.", variant: "destructive" })
+      }
+    }
+
+    const uploadImageForSong = async (songId: string, file?: File) => {
+      if (!file) return
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+      if (!cloudName || !uploadPreset) {
+        toast({
+          title: "Cloudinary not configured",
+          description: "Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      try {
+        setNewSongs((prev) =>
+          prev.map((s) =>
+            s.id === songId ? { ...s, imageUploading: true, imageProgress: 0 } : s
+          )
+        )
+        const formData = new FormData()
+        formData.append("file", file)
+        formData.append("upload_preset", uploadPreset)
+        const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
+        const res = await axios.post(url, formData, {
+          onUploadProgress: (evt) => {
+            if (!evt.total) return
+            const pct = Math.round((evt.loaded / evt.total) * 100)
+            setNewSongs((prev) =>
+              prev.map((s) => (s.id === songId ? { ...s, imageProgress: pct } : s))
+            )
+          },
+        })
+        const secureUrl = res?.data?.secure_url || res?.data?.url || ""
+        setNewSongs((prev) =>
+          prev.map((s) =>
+            s.id === songId ? { ...s, trackImg: secureUrl, imageUploading: false } : s
+          )
+        )
+      } catch (err) {
+        setNewSongs((prev) =>
+          prev.map((s) =>
+            s.id === songId ? { ...s, imageUploading: false, imageProgress: 0 } : s
+          )
+        )
+        toast({ title: "Upload failed", description: "Could not upload cover image.", variant: "destructive" })
+      }
+    }
   const [selectedCategory, setSelectedCategory] = useState<string>("")
   const [selectedGenre, setSelectedGenre] = useState<string>("")
   const { artistName } = useArtistName()
@@ -61,7 +172,17 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
         toast({ title: "Warning", description: "Failed to load categories or genres.", variant: "default" })
       }
     }
+    const loadSongs = async () => {
+      try {
+        const res = await contentApi.getMySongs()
+        const list: Song[] = res?.songs ?? []
+        setSongs(list)
+      } catch {
+        setSongs([])
+      }
+    }
     loadTaxonomies()
+    loadSongs()
   }, [toast, selectedCategory, selectedGenre])
 
   // Artist name is now sourced from a reusable hook and rendered read-only
@@ -74,11 +195,28 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
         category: selectedCategory ? [selectedCategory] : [],
         genre: selectedGenre ? [selectedGenre] : [],
         author: artistName || data.author || "",
+        tracksId: selectedSongs,
       }
-      await albumsApi.uploadAlbum(payload)
+      const albumRes = await albumsApi.uploadAlbum(payload)
+      const albumId = albumRes?.album?._id || albumRes?.album?.id || albumRes?.albumId || albumRes?._id
+
+      if (albumId && newSongs.length) {
+        for (const song of newSongs) {
+          if (!song.title || !song.trackUrl || !song.trackImg) continue
+          await albumsApi.uploadSongToAlbum({
+            albumId,
+            title: song.title,
+            author: artistName || data.author || "",
+            trackUrl: song.trackUrl,
+            trackImg: song.trackImg,
+          })
+        }
+      }
       toast({ title: "Success", description: "Album uploaded successfully!" })
       setOpen(false)
       reset()
+      setSelectedSongs([])
+      setNewSongs([])
       onAlbumUploaded()
     } catch (error) {
       toast({ title: "Error", description: "Failed to upload album.", variant: "destructive" })
@@ -95,25 +233,27 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
           Upload Album
         </Button>
       </DialogTrigger>
-  <DialogContent className="sm:max-w-125 border-border/50">
+      <DialogContent className="sm:max-w-2xl border-border/50 max-h-[80vh] overflow-y-auto">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>Upload New Album</DialogTitle>
             <DialogDescription>Add a new album to your Apostles profile.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Album Name</Label>
-              <Input id="name" {...register("name", { required: true })} placeholder="Debut Album" />
-              {errors.name && <p className="text-xs text-destructive">Album name is required</p>}
+          <div className="grid gap-5 py-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">Album Name</Label>
+                <Input id="name" {...register("name", { required: true })} placeholder="Debut Album" />
+                {errors.name && <p className="text-xs text-destructive">Album name is required</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="author">Artist Name</Label>
+                {/* Visible display only; actual value sent via hidden registered input below */}
+                <Input id="author" placeholder="Artist Name" value={artistName} disabled />
+                <input type="hidden" {...register("author")} value={artistName} />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="author">Artist Name</Label>
-              {/* Visible display only; actual value sent via hidden registered input below */}
-              <Input id="author" placeholder="Artist Name" value={artistName} disabled />
-              <input type="hidden" {...register("author")} value={artistName} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -155,7 +295,130 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" {...register("description")} placeholder="Describe the album..." />
+              <Textarea id="description" {...register("description")} placeholder="Describe the album..." className="min-h-28" />
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border/50 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Music2 className="size-4" />
+                Add songs to this album
+              </div>
+              {songs.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No songs available yet. Upload songs first.</p>
+              ) : (
+                <div className="grid gap-3 max-h-52 overflow-auto pr-2">
+                  {songs.map((song) => (
+                    <label key={song._id} className="flex items-center gap-3 rounded-lg border border-border/40 px-3 py-2">
+                      <Checkbox
+                        checked={selectedSongs.includes(song._id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedSongs((prev) =>
+                            checked ? [...prev, song._id] : prev.filter((id) => id !== song._id)
+                          )
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{song.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{song.author}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border/50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Disc className="size-4" />
+                  Add new songs now
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 border-border/50 bg-transparent"
+                  onClick={() =>
+                    setNewSongs((prev) => [
+                      ...prev,
+                      { id: `${Date.now()}-${prev.length}`, title: "", trackUrl: "", trackImg: "" },
+                    ])
+                  }
+                >
+                  Add song
+                </Button>
+              </div>
+              {newSongs.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Create new tracks and attach them to this album.</p>
+              ) : (
+                <div className="grid gap-4">
+                  {newSongs.map((song, index) => (
+                    <div key={song.id} className="grid gap-3 rounded-lg border border-border/40 p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-muted-foreground">Track {index + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          onClick={() => setNewSongs((prev) => prev.filter((s) => s.id !== song.id))}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Title</Label>
+                          <Input
+                            value={song.title}
+                            onChange={(e) =>
+                              setNewSongs((prev) =>
+                                prev.map((s) => (s.id === song.id ? { ...s, title: e.target.value } : s))
+                              )
+                            }
+                            placeholder="Song title"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Audio file</Label>
+                          <Input
+                            type="file"
+                            accept="audio/*"
+                            onChange={(e) => uploadAudioForSong(song.id, e.target.files?.[0])}
+                          />
+                          {song.audioUploading && (
+                            <div className="h-2 w-full rounded bg-secondary overflow-hidden">
+                              <div className="h-full bg-primary" style={{ width: `${song.audioProgress ?? 0}%` }} />
+                            </div>
+                          )}
+                          {song.trackUrl && (
+                            <p className="text-xs text-muted-foreground break-all">{song.trackUrl}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Cover image</Label>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => uploadImageForSong(song.id, e.target.files?.[0])}
+                        />
+                        {song.imageUploading && (
+                          <div className="h-2 w-full rounded bg-secondary overflow-hidden">
+                            <div className="h-full bg-primary" style={{ width: `${song.imageProgress ?? 0}%` }} />
+                          </div>
+                        )}
+                        {song.trackImg && (
+                          <div className="flex items-center gap-3">
+                            <ImageIcon className="size-4 text-muted-foreground" />
+                            <img src={song.trackImg} alt="Cover preview" className="h-12 w-12 rounded object-cover border border-border/50" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

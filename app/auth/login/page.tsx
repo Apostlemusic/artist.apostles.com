@@ -28,6 +28,8 @@ export default function LoginPage() {
         const sixDaysMs = 6 * 24 * 60 * 60 * 1000
         const payload = { exp: Date.now() + sixDaysMs, email: data.email }
         window.localStorage.setItem("apostles_auth", JSON.stringify(payload))
+        if (res?.accessToken) window.localStorage.setItem("apostles_access_token", String(res.accessToken))
+        if (res?.refreshToken) window.localStorage.setItem("apostles_refresh_token", String(res.refreshToken))
         // Store artist id and name if present in response
         const artistId = (res?.artist && (res.artist.id || res.artist._id)) || undefined
         const artistName = (res?.artist && res.artist.name) || undefined

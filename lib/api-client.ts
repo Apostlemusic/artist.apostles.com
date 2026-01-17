@@ -16,6 +16,15 @@ apiClient.interceptors.request.use(
   (config) => {
     // In a real app, you might get the token from a secure store or cookie
     // The postman docs mention cookies like apostolicaccesstoken
+    if (typeof window !== "undefined") {
+      try {
+        const token = window.localStorage.getItem("apostles_access_token")
+        if (token) {
+          config.headers = config.headers || {}
+          config.headers.Authorization = `Bearer ${token}`
+        }
+      } catch {}
+    }
     return config
   },
   (error) => Promise.reject(error),

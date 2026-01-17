@@ -11,6 +11,10 @@ export const contentApi = {
     const res = await apiClient.post("/api/artist/song/upload", data)
     return res.data
   },
+  async editSong(songId: string, partial: Partial<import("@/lib/types").UploadSongData & { title?: string; description?: string; lyrics?: string }>): Promise<any> {
+    const res = await apiClient.post("/api/artist/song/edit", { songId, ...partial })
+    return res.data
+  },
   async hideSong(songId: string): Promise<any> {
     const res = await apiClient.post("/api/artist/song/hide", { songId })
     return res.data

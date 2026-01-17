@@ -26,6 +26,8 @@ export function logout(redirectTo: string = "/auth/login") {
     window.localStorage.removeItem("apostles_email")
     window.localStorage.removeItem("apostles_artist_id")
     window.localStorage.removeItem("apostles_artist_name")
+    window.localStorage.removeItem("apostles_access_token")
+    window.localStorage.removeItem("apostles_refresh_token")
   } catch {}
   window.location.href = redirectTo
 }

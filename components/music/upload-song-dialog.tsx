@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import axios from "axios"
-import { Plus, Music, ImageIcon, Loader2 } from "lucide-react"
+import { Plus, Music, ImageIcon, Loader2, FileText } from "lucide-react"
 
 import {
   Dialog,
@@ -91,6 +91,20 @@ export function UploadSongDialog({ onSongUploaded }: { onSongUploaded: () => voi
     }
   }
 
+  const handleLyricsFile = (file?: File) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = String(reader.result || "")
+      setValue("lyrics", text, { shouldValidate: true })
+      toast({ title: "Lyrics uploaded", description: "Lyrics have been added to the form." })
+    }
+    reader.onerror = () => {
+      toast({ title: "Error", description: "Failed to read lyrics file.", variant: "destructive" })
+    }
+    reader.readAsText(file)
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -99,14 +113,14 @@ export function UploadSongDialog({ onSongUploaded }: { onSongUploaded: () => voi
           Upload Song
         </Button>
       </DialogTrigger>
-  <DialogContent className="sm:max-w-125 border-border/50">
+      <DialogContent className="sm:max-w-2xl border-border/50">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>Upload New Song</DialogTitle>
             <DialogDescription>Add a new track to your Apostles profile.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-5 py-4">
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Title</Label>
                 <Input id="title" {...register("title", { required: true })} placeholder="Song Title" />
@@ -118,7 +132,7 @@ export function UploadSongDialog({ onSongUploaded }: { onSongUploaded: () => voi
                 <input type="hidden" {...register("author")} value={artistName} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -164,9 +178,25 @@ export function UploadSongDialog({ onSongUploaded }: { onSongUploaded: () => voi
               }}
               registerField={register("trackImg")}
             />
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" {...register("description")} placeholder="Tell us about this track..." />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" {...register("description")} placeholder="Tell us about this track..." className="min-h-28" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lyrics">Lyrics</Label>
+                <Textarea id="lyrics" {...register("lyrics")} placeholder="Paste lyrics here..." className="min-h-28" />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <FileText className="size-3" />
+                  Upload a .txt file to auto-fill lyrics
+                </div>
+                <Input
+                  id="lyricsFile"
+                  type="file"
+                  accept=".txt"
+                  onChange={(e) => handleLyricsFile(e.target.files?.[0])}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

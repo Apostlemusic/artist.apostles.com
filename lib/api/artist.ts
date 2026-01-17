@@ -17,6 +17,22 @@ export const artistApi = {
   },
 
   // Profile
+  async getProfileMe(): Promise<any> {
+    const res = await apiClient.get("/api/artist/profile/me")
+    return res.data
+  },
+  async getArtistById(artistId: string): Promise<any> {
+    const res = await apiClient.get(`/api/artist/getArtistById/${artistId}`)
+    return res.data
+  },
+  async getArtistByName(name: string): Promise<any> {
+    const res = await apiClient.get(`/api/artist/getArtistByName/${encodeURIComponent(name)}`)
+    return res.data
+  },
+  async getAllArtists(): Promise<any> {
+    const res = await apiClient.get("/api/artist/getAllArtists")
+    return res.data
+  },
   async editProfile(data: EditProfileData): Promise<any> {
     const res = await apiClient.post("/api/artist/profile/edit", data)
     return res.data
@@ -49,6 +65,18 @@ export const artistApi = {
   },
   async isVerified(email: string): Promise<any> {
     const res = await apiClient.get(`/api/artist/isVerified`, { params: { email } })
+    return res.data
+  },
+  async followArtist(artistId: string, userId: string): Promise<any> {
+    const res = await apiClient.post("/api/artist/followArtist", { artistId, userId })
+    return res.data
+  },
+  async likeArtist(artistId: string, userId: string): Promise<any> {
+    const res = await apiClient.post("/api/artist/likeArtist", { artistId, userId })
+    return res.data
+  },
+  async deleteArtist(artistId: string): Promise<any> {
+    const res = await apiClient.post("/api/artist/deleteArtist", { artistId })
     return res.data
   },
 }

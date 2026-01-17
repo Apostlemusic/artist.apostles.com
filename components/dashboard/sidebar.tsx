@@ -55,11 +55,11 @@ const navItems = [
   //   icon: Users,
   //   href: "/dashboard/social",
   // },
-  // {
-  //   title: "Profile",
-  //   icon: User,
-  //   href: "/dashboard/profile",
-  // },
+  {
+    title: "Profile",
+    icon: User,
+    href: "/dashboard/profile",
+  },
 ]
 
 export function DashboardSidebar() {
