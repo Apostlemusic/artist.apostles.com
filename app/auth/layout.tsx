@@ -11,7 +11,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/placeholder-logo.svg" alt="Apostles" width={24} height={24} className="dark:opacity-90" />
+            <Image src="/Apostle-Logo-sm.png" alt="Apostles" width={24} height={24} className="dark:opacity-90" />
             <span className="text-sm font-semibold">Apostles</span>
           </Link>
           <nav className="flex items-center gap-2">
