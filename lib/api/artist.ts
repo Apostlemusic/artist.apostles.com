@@ -34,7 +34,16 @@ export const artistApi = {
     return res.data
   },
   async editProfile(data: EditProfileData): Promise<any> {
-    const res = await apiClient.post("/api/artist/profile/edit", data)
+    const payload: Record<string, unknown> = {}
+    if (data.name !== undefined) payload.name = data.name
+    if (data.about !== undefined) payload.about = data.about
+    if (data.description !== undefined) payload.description = data.description
+    if (data.type !== undefined) payload.type = data.type
+    if (data.profileImg !== undefined) {
+      payload.profileImg = data.profileImg
+      payload.imageUrl = data.profileImg
+    }
+    const res = await apiClient.post("/api/artist/profile/edit", payload)
     return res.data
   },
 

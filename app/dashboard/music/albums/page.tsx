@@ -32,12 +32,14 @@ export default function AlbumsPage() {
       const data = await albumsApi.getMyAlbums()
       if (data.success) {
         setAlbums(data.albums)
+        toast({ title: "Loaded", description: "Albums list updated." })
       } else if (Array.isArray(data)) {
         // Fallback in case API returns a raw array
         setAlbums(data as Album[])
+        toast({ title: "Loaded", description: "Albums list updated." })
       }
     } catch (error) {
-      console.error("Failed to fetch albums:", error)
+      toast({ title: "Error", description: "Failed to load albums.", variant: "destructive" })
     } finally {
       setLoading(false)
     }

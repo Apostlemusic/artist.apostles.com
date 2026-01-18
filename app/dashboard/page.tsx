@@ -10,12 +10,14 @@ import { useArtistName } from "@/hooks/use-artist-name"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useToast } from "@/hooks/use-toast"
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<ArtistStats | null>(null)
   const [artist, setArtist] = useState<Artist | null>(null)
   const [loading, setLoading] = useState(true)
   const { artistName } = useArtistName()
+  const { toast } = useToast()
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -23,9 +25,10 @@ export default function DashboardPage() {
         const statsRes = await artistApi.getStats()
         if (statsRes?.success) {
           setStats(statsRes.stats)
+          toast({ title: "Loaded", description: "Dashboard stats updated." })
         }
       } catch (error) {
-        console.error("Failed to fetch stats:", error)
+        toast({ title: "Error", description: "Failed to load dashboard stats.", variant: "destructive" })
       } finally {
         setLoading(false)
       }
@@ -38,9 +41,14 @@ export default function DashboardPage() {
     artistApi
       .getArtistByName(artistName)
       .then((res) => {
-        if (res?.success) setArtist(res.artist)
+        if (res?.success) {
+          setArtist(res.artist)
+          toast({ title: "Loaded", description: "Artist profile updated." })
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        toast({ title: "Error", description: "Failed to load artist profile.", variant: "destructive" })
+      })
   }, [artistName])
 
   if (loading) {

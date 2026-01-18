@@ -53,6 +53,15 @@ export type UploadAlbumData = {
   genre: string[]
   tracksId: string[]
   author?: string
+  songs?: Array<{
+    title: string
+    author: string
+    trackUrl: string
+    trackImg: string
+    category?: string[]
+    genre?: string[]
+    trackId?: string
+  }>
 }
 
 // Taxonomies
@@ -79,9 +88,11 @@ export type UploadSongData = {
 }
 
 export type EditProfileData = {
+  name?: string
   about: string
   description: string
   profileImg: string
+  type?: string
 }
 
 // Auth payloads

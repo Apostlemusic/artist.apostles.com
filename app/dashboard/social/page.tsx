@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SocialPage() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -19,9 +21,11 @@ export default function SocialPage() {
         const data = await artistApi.getStats()
         if (data.success) {
           setStats(data.stats)
+          toast({ title: "Loaded", description: "Social insights updated." })
         }
       } catch (error) {
         console.error("Failed to fetch social stats:", error)
+        toast({ title: "Error", description: "Failed to load social insights.", variant: "destructive" })
       } finally {
         setLoading(false)
       }
@@ -35,6 +39,7 @@ export default function SocialPage() {
 
   return (
     <div className="space-y-8">
+        const { toast } = useToast()
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Social Insights</h1>
         <p className="text-muted-foreground mt-1">Track your engagement and connect with your audience.</p>

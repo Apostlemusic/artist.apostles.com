@@ -101,6 +101,8 @@ export const db = {
   updateProfile(email: string, profile: EditProfileData) {
     const u = users.get(email)
     if (u) {
+      if (profile.name !== undefined) u.name = profile.name
+      if (profile.type !== undefined) u.type = profile.type
       u.profile = profile
       u.about = profile.about
       u.description = profile.description

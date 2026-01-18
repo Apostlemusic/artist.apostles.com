@@ -31,7 +31,7 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
   const [categories, setCategories] = useState<Category[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
   const [songs, setSongs] = useState<Song[]>([])
-  const [selectedSongs, setSelectedSongs] = useState<string[]>([])
+  const [selectedTracks, setSelectedTracks] = useState<string[]>([])
   const [newSongs, setNewSongs] = useState<
     Array<{
       id: string
@@ -82,6 +82,9 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
             s.id === songId ? { ...s, trackUrl: secureUrl, audioUploading: false } : s
           )
         )
+        if (secureUrl) {
+          toast({ title: "Audio uploaded", description: "Audio URL attached." })
+        }
       } catch (err) {
         setNewSongs((prev) =>
           prev.map((s) =>
@@ -130,6 +133,9 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
             s.id === songId ? { ...s, trackImg: secureUrl, imageUploading: false } : s
           )
         )
+        if (secureUrl) {
+          toast({ title: "Cover uploaded", description: "Cover URL attached." })
+        }
       } catch (err) {
         setNewSongs((prev) =>
           prev.map((s) =>
@@ -177,8 +183,12 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
         const res = await contentApi.getMySongs()
         const list: Song[] = res?.songs ?? []
         setSongs(list)
+        if (list.length) {
+          toast({ title: "Loaded", description: "Songs available for album selection." })
+        }
       } catch {
         setSongs([])
+        toast({ title: "Error", description: "Failed to load songs for album selection.", variant: "destructive" })
       }
     }
     loadTaxonomies()
@@ -190,32 +200,40 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
   const onSubmit = async (data: UploadAlbumData) => {
     setLoading(true)
     try {
+      const songsPayload = newSongs
+        .filter((song) => song.title && song.trackUrl && song.trackImg)
+        .map((song) => ({
+          title: song.title,
+          author: artistName || data.author || "",
+          trackUrl: song.trackUrl,
+          trackImg: song.trackImg,
+          category: selectedCategory ? [selectedCategory] : [],
+          genre: selectedGenre ? [selectedGenre] : [],
+        }))
+
+      if (songsPayload.length === 0 && selectedTracks.length === 0) {
+        toast({
+          title: "Add songs",
+          description: "Include at least one song (select existing or add new).",
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
+      }
+
       const payload: UploadAlbumData = {
         ...data,
         category: selectedCategory ? [selectedCategory] : [],
         genre: selectedGenre ? [selectedGenre] : [],
         author: artistName || data.author || "",
-        tracksId: selectedSongs,
+        tracksId: selectedTracks,
+        songs: songsPayload.length ? songsPayload : undefined,
       }
       const albumRes = await albumsApi.uploadAlbum(payload)
-      const albumId = albumRes?.album?._id || albumRes?.album?.id || albumRes?.albumId || albumRes?._id
-
-      if (albumId && newSongs.length) {
-        for (const song of newSongs) {
-          if (!song.title || !song.trackUrl || !song.trackImg) continue
-          await albumsApi.uploadSongToAlbum({
-            albumId,
-            title: song.title,
-            author: artistName || data.author || "",
-            trackUrl: song.trackUrl,
-            trackImg: song.trackImg,
-          })
-        }
-      }
       toast({ title: "Success", description: "Album uploaded successfully!" })
       setOpen(false)
       reset()
-      setSelectedSongs([])
+      setSelectedTracks([])
       setNewSongs([])
       onAlbumUploaded()
     } catch (error) {
@@ -307,22 +325,25 @@ export function UploadAlbumDialog({ onAlbumUploaded }: { onAlbumUploaded: () => 
                 <p className="text-xs text-muted-foreground">No songs available yet. Upload songs first.</p>
               ) : (
                 <div className="grid gap-3 max-h-52 overflow-auto pr-2">
-                  {songs.map((song) => (
-                    <label key={song._id} className="flex items-center gap-3 rounded-lg border border-border/40 px-3 py-2">
-                      <Checkbox
-                        checked={selectedSongs.includes(song._id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedSongs((prev) =>
-                            checked ? [...prev, song._id] : prev.filter((id) => id !== song._id)
-                          )
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{song.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">{song.author}</p>
-                      </div>
-                    </label>
-                  ))}
+                  {songs.map((song) => {
+                    const trackValue = song.trackId || song._id
+                    return (
+                      <label key={song._id} className="flex items-center gap-3 rounded-lg border border-border/40 px-3 py-2">
+                        <Checkbox
+                          checked={selectedTracks.includes(trackValue)}
+                          onCheckedChange={(checked) => {
+                            setSelectedTracks((prev) =>
+                              checked ? [...prev, trackValue] : prev.filter((id) => id !== trackValue)
+                            )
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{song.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{song.author}</p>
+                        </div>
+                      </label>
+                    )
+                  })}
                 </div>
               )}
             </div>

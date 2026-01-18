@@ -32,9 +32,10 @@ export default function SongsPage() {
       const data = await contentApi.getMySongs()
       if (data.success) {
         setSongs(data.songs)
+        toast({ title: "Loaded", description: "Songs list updated." })
       }
     } catch (error) {
-      console.error("Failed to fetch songs:", error)
+      toast({ title: "Error", description: "Failed to load songs.", variant: "destructive" })
     } finally {
       setLoading(false)
     }

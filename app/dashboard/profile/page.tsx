@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
-import { Camera, Save, Loader2, Mail, Globe } from "lucide-react"
+import { Camera, Save, Loader2, Mail, KeyRound, Trash2 } from "lucide-react"
 
 import { artistApi } from "@/lib/api/artist"
 import type { EditProfileData } from "@/lib/types"
@@ -15,11 +15,24 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { PasswordInput } from "@/components/ui/password-input"
+import { logout } from "@/lib/auth"
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(false)
   const [artist, setArtist] = useState<Artist | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [resetEmail, setResetEmail] = useState("")
+  const [resetOtp, setResetOtp] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [passwordLoading, setPasswordLoading] = useState(false)
   const { toast } = useToast()
 
   const {
@@ -35,6 +48,8 @@ export default function ProfilePage() {
     },
   })
 
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
+
   useEffect(() => {
     artistService
       .getProfileMe()
@@ -42,25 +57,141 @@ export default function ProfilePage() {
         const data: Artist = payload?.artist ?? payload
         setArtist(data)
         // Pre-fill form with fetched values
+        const name = data.name ?? ""
         const about = data.about ?? ""
         const description = data.description ?? ""
         const profileImg = data.profileImg ?? ""
         // @ts-ignore - using RHF reset via closure
-        reset({ about, description, profileImg })
+        reset({ name, about, description, profileImg })
+        if (data.email) setResetEmail(data.email)
       })
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (!avatarFile) return
+    const url = URL.createObjectURL(avatarFile)
+    setAvatarPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [avatarFile])
+
   const onSubmit = async (data: EditProfileData) => {
     setLoading(true)
     try {
-      await artistApi.editProfile(data)
+      let profileImgUrl = data.profileImg
+      if (avatarFile) {
+        profileImgUrl = await uploadAvatar(avatarFile)
+        if (!profileImgUrl) {
+          toast({ title: "Upload failed", description: "Avatar upload did not return a URL.", variant: "destructive" })
+          setLoading(false)
+          return
+        }
+      }
+      const payload: EditProfileData = {
+        ...data,
+        profileImg: profileImgUrl,
+      }
+      await artistApi.editProfile(payload)
       toast({ title: "Profile Updated", description: "Your changes have been saved successfully." })
       setIsEditing(false)
+      setArtist((prev) => ({ ...(prev ?? {}), ...payload }))
+      setAvatarFile(null)
+      setAvatarPreview(null)
     } catch (error) {
       toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const uploadAvatar = async (file?: File) => {
+    if (!file) return ""
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+    if (!cloudName || !uploadPreset) {
+      toast({
+        title: "Cloudinary not configured",
+        description: "Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+        variant: "destructive",
+      })
+      return ""
+    }
+
+    try {
+      setUploadingAvatar(true)
+      setUploadProgress(0)
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("upload_preset", uploadPreset)
+      const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
+      const res = await import("axios").then(({ default: axios }) =>
+        axios.post(url, formData, {
+          onUploadProgress: (evt) => {
+            if (!evt.total) return
+            const pct = Math.round((evt.loaded / evt.total) * 100)
+            setUploadProgress(pct)
+          },
+        })
+      )
+      const secureUrl = res?.data?.secure_url || res?.data?.url || ""
+      if (secureUrl) {
+        toast({ title: "Avatar uploaded", description: "Profile image updated." })
+        return secureUrl
+      }
+      toast({ title: "Upload failed", description: "No URL returned from Cloudinary.", variant: "destructive" })
+      return ""
+    } catch {
+      toast({ title: "Upload failed", description: "Could not upload avatar.", variant: "destructive" })
+      return ""
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
+  const handleRequestOtp = async () => {
+    if (!resetEmail) {
+      toast({ title: "Email required", description: "Enter your account email.", variant: "destructive" })
+      return
+    }
+    try {
+      const res = await artistApi.forgotPassword({ email: resetEmail })
+      toast({ title: "OTP sent", description: res?.otp ? `OTP: ${res.otp}` : "Check your email for the OTP." })
+    } catch {
+      toast({ title: "Error", description: "Failed to send OTP.", variant: "destructive" })
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!resetEmail || !resetOtp || !newPassword) {
+      toast({ title: "Missing fields", description: "Fill in email, OTP, and new password.", variant: "destructive" })
+      return
+    }
+    setPasswordLoading(true)
+    try {
+      await artistApi.resetPassword({ email: resetEmail, otp: resetOtp, newPassword })
+      toast({ title: "Password updated", description: "Your password has been changed." })
+      setPasswordOpen(false)
+      setResetOtp("")
+      setNewPassword("")
+    } catch {
+      toast({ title: "Error", description: "Failed to update password.", variant: "destructive" })
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    const artistId = artist?.id || artist?._id
+    if (!artistId) {
+      toast({ title: "Error", description: "Missing artist id.", variant: "destructive" })
+      return
+    }
+    try {
+      await artistApi.deleteArtist(artistId)
+      toast({ title: "Account deleted", description: "Your account has been removed." })
+      logout("/auth/register")
+    } catch {
+      toast({ title: "Error", description: "Failed to delete account.", variant: "destructive" })
     }
   }
 
@@ -86,7 +217,7 @@ export default function ProfilePage() {
                 <div className="flex flex-col md:flex-row md:items-center gap-6">
                   <div className="relative group">
                     <Avatar className="size-24 border-2 border-primary/20">
-                      <AvatarImage src={artist?.profileImg || "/placeholder-user.jpg"} />
+                      <AvatarImage src={avatarPreview || artist?.profileImg || "/placeholder-user.jpg"} />
                       <AvatarFallback className="bg-primary/5 text-primary text-xl font-bold">
                         {(artist?.name || "Artist").split(" ").map((p) => p[0]).slice(0,2).join("")}
                       </AvatarFallback>
@@ -100,9 +231,20 @@ export default function ProfilePage() {
                         variant="secondary"
                         size="icon"
                         className="absolute -bottom-1 -left-1 size-8 rounded-full shadow-md"
+                        disabled={uploadingAvatar}
+                        onClick={() => avatarInputRef.current?.click()}
                       >
                         <Camera className="size-4" />
                       </Button>
+                    )}
+                    {isEditing && (
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        ref={avatarInputRef}
+                        onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                      />
                     )}
                   </div>
                   <div className="space-y-1">
@@ -118,6 +260,10 @@ export default function ProfilePage() {
                   <>
                     <div className="grid gap-4">
                       <div className="space-y-2">
+                        <Label htmlFor="name">Artist name</Label>
+                        <Input id="name" {...register("name")} placeholder="Artist name" />
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="about">Artist tagline</Label>
                         <Input id="about" {...register("about")} placeholder="A short statement fans remember" />
                       </div>
@@ -132,23 +278,6 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="website">Website</Label>
-                        <div className="relative">
-                          <Globe className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-                          <Input id="website" placeholder="https://yourwebsite.com" className="pl-9" />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="instagram">Instagram</Label>
-                        <Input id="instagram" placeholder="@username" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="twitter">Twitter / X</Label>
-                        <Input id="twitter" placeholder="@username" />
-                      </div>
-                    </div>
                   </>
                 ) : (
                   <>
@@ -157,21 +286,6 @@ export default function ProfilePage() {
                       <p className="text-sm text-foreground/90">
                         {artist?.description || "Share your story to connect with your audience."}
                       </p>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground">Website</Label>
-                        <p className="text-sm text-foreground/90">https://yourwebsite.com</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground">Instagram</Label>
-                        <p className="text-sm text-foreground/90">@username</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground">Twitter / X</Label>
-                        <p className="text-sm text-foreground/90">@username</p>
-                      </div>
                     </div>
                   </>
                 )}
@@ -202,16 +316,87 @@ export default function ProfilePage() {
               >
                 {isEditing ? "Cancel Editing" : "Edit Profile"}
               </Button>
-              <Button variant="outline" className="w-full justify-start text-sm h-10 border-border/50 bg-transparent">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-sm h-10 border-border/50 bg-transparent"
+                onClick={() => setPasswordOpen(true)}
+              >
+                <KeyRound className="mr-2 size-4" />
                 Change Password
               </Button>
-              <Button variant="destructive" className="w-full justify-start text-sm h-10">
-                Delete Account
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="w-full justify-start text-sm h-10">
+                    <Trash2 className="mr-2 size-4" />
+                    Delete Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete account?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action is permanent and will remove your artist account and content.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAccount}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change password</DialogTitle>
+            <DialogDescription>Request an OTP and set a new password.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Email</Label>
+              <Input
+                id="reset-email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="artist@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-otp">OTP</Label>
+              <Input
+                id="reset-otp"
+                value={resetOtp}
+                onChange={(e) => setResetOtp(e.target.value)}
+                placeholder="123456"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-pass">New password</Label>
+              <PasswordInput
+                id="reset-pass"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            <Button variant="outline" onClick={handleRequestOtp}>
+              Request OTP
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPasswordOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleResetPassword} disabled={passwordLoading}>
+              {passwordLoading ? "Saving..." : "Save password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
